@@ -58,7 +58,7 @@
   header.page-head p{margin:0;color:#5B5F55;font-size:14px;max-width:60ch;}
 
   /* ---------- dashboard ---------- */
-  .strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px;}
+  .strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:28px;}
   .stat{background:var(--paper);border:1px solid var(--line);border-radius:3px;padding:16px 18px;}
   .stat .num{font-family:var(--mono);font-size:28px;font-weight:600;line-height:1;}
   .stat .lbl{font-size:12.5px;color:#5B5F55;margin-top:6px;}
@@ -76,6 +76,7 @@
   .tag.cleaning{background:var(--steel-light);color:var(--steel);}
   .tag.repair{background:#F3E4C9;color:var(--amber-dark);}
   .tag.incident{background:var(--signal-light);color:var(--signal);}
+  .tag.generator{background:#EFE6C9;color:#7A5B12;}
   .empty-note{color:#8A8F82;font-size:13.5px;padding:14px 0;}
 
   /* ---------- section (cleaning/repairs/incidents) ---------- */
@@ -164,6 +165,7 @@
       <button data-view="cleaning">Cleaning <span class="count" id="nav-count-cleaning"></span></button>
       <button data-view="repairs">Repairs <span class="count" id="nav-count-repairs"></span></button>
       <button data-view="incidents">Incidents <span class="count" id="nav-count-incidents"></span></button>
+      <button data-view="generators">Generators &amp; Fuel <span class="count" id="nav-count-generators"></span></button>
     </nav>
     <div class="rail-foot no-print">
       Data is stored only in this browser. Nothing is sent anywhere. Use Export to keep a copy.
@@ -183,6 +185,7 @@
         <div class="stat"><div class="num" id="stat-open-cleaning">0</div><div class="lbl">Cleaning tasks scheduled</div></div>
         <div class="stat amber"><div class="num" id="stat-open-repairs">0</div><div class="lbl">Repairs open</div></div>
         <div class="stat warn"><div class="num" id="stat-open-incidents">0</div><div class="lbl">Incidents unresolved</div></div>
+        <div class="stat amber"><div class="num" id="stat-open-generators">0</div><div class="lbl">Generator tasks due</div></div>
         <div class="stat"><div class="num" id="stat-total">0</div><div class="lbl">Total logged, all time</div></div>
       </div>
 
@@ -348,19 +351,76 @@
       </table>
     </section>
 
+    <!-- GENERATORS & FUEL -->
+    <section class="view" id="view-generators">
+      <header class="page-head">
+        <h2>Generators &amp; fuel</h2>
+        <p>Servicing, load tests, and fuel top-ups for backup generators.</p>
+      </header>
+      <div class="toolbar no-print">
+        <div class="filters">
+          <select id="generators-filter-status" onchange="renderTable('generators')">
+            <option value="">All statuses</option>
+            <option>Scheduled</option><option>Completed</option><option>Skipped</option>
+          </select>
+          <select id="generators-filter-activity" onchange="renderTable('generators')">
+            <option value="">All activities</option>
+            <option>Routine Service</option><option>Oil/Filter Check</option><option>Load Test</option><option>Refuel</option><option>Other</option>
+          </select>
+          <input type="text" id="generators-filter-text" placeholder="Search generator or notes…" oninput="renderTable('generators')">
+        </div>
+        <div class="btn-row">
+          <button class="btn ghost" onclick="downloadCSV('generators')">Export CSV</button>
+          <button class="btn amber" onclick="toggleForm('generators')">+ Log generator / fuel entry</button>
+        </div>
+      </div>
+
+      <form class="entry-form" id="form-generators" onsubmit="return addEntry(event,'generators')">
+        <h4>New generator / fuel entry</h4>
+        <div class="grid2">
+          <div class="field"><label>Generator / location</label><input required type="text" name="generator" placeholder="e.g. Warehouse backup genset"></div>
+          <div class="field"><label>Activity</label>
+            <select name="activity"><option>Routine Service</option><option>Oil/Filter Check</option><option>Load Test</option><option>Refuel</option><option>Other</option></select>
+          </div>
+          <div class="field"><label>Fuel level after (%)</label><input type="number" min="0" max="100" name="fuelLevel" placeholder="e.g. 80"></div>
+          <div class="field"><label>Fuel added (L)</label><input type="number" min="0" step="0.1" name="fuelAdded" placeholder="e.g. 50"></div>
+          <div class="field"><label>Run hours (optional)</label><input type="number" min="0" step="0.1" name="runHours" placeholder="e.g. 120.5"></div>
+          <div class="field"><label>Performed by</label><input type="text" name="performedBy" placeholder="Name or vendor"></div>
+          <div class="field"><label>Date</label><input required type="date" name="date"></div>
+          <div class="field"><label>Status</label>
+            <select name="status"><option>Scheduled</option><option>Completed</option><option>Skipped</option></select>
+          </div>
+          <div class="field full"><label>Notes (optional)</label><textarea name="notes" placeholder="Any detail worth keeping"></textarea></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn" type="submit">Save entry</button>
+          <button class="btn ghost" type="button" onclick="toggleForm('generators')">Cancel</button>
+        </div>
+      </form>
+
+      <table>
+        <thead><tr><th>ID</th><th>Generator</th><th>Activity</th><th>Fuel level</th><th>Fuel added</th><th>Performed by</th><th>Date</th><th>Status</th><th class="no-print"></th></tr></thead>
+        <tbody id="table-generators"></tbody>
+      </table>
+    </section>
+
   </main>
 </div>
 
 <script>
 const STORAGE_KEY = 'facilityLogData';
-const TYPES = ['cleaning','repairs','incidents'];
+const TYPES = ['cleaning','repairs','incidents','generators'];
 
 function loadData(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
-    if(raw) return JSON.parse(raw);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      if(!parsed.generators) parsed.generators = [];
+      return parsed;
+    }
   }catch(e){}
-  return { cleaning: [], repairs: [], incidents: [] };
+  return { cleaning: [], repairs: [], incidents: [], generators: [] };
 }
 function saveData(){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -428,11 +488,13 @@ function renderTable(type){
   const textFilter = (document.getElementById(type+'-filter-text')?.value || '').toLowerCase();
   const priFilter = document.getElementById(type+'-filter-priority')?.value || '';
   const sevFilter = document.getElementById(type+'-filter-severity')?.value || '';
+  const activityFilter = document.getElementById(type+'-filter-activity')?.value || '';
 
   let rows = data[type].slice();
   if(statusFilter) rows = rows.filter(r=>r.status===statusFilter);
   if(priFilter) rows = rows.filter(r=>r.priority===priFilter);
   if(sevFilter) rows = rows.filter(r=>r.severity===sevFilter);
+  if(activityFilter) rows = rows.filter(r=>r.activity===activityFilter);
   if(textFilter){
     rows = rows.filter(r => JSON.stringify(r).toLowerCase().includes(textFilter));
   }
@@ -445,6 +507,7 @@ function renderTable(type){
   let statusOptions;
   if(type==='cleaning') statusOptions = ['Scheduled','Completed','Skipped'];
   else if(type==='repairs') statusOptions = ['Open','In Progress','Resolved'];
+  else if(type==='generators') statusOptions = ['Scheduled','Completed','Skipped'];
   else statusOptions = ['Open','Investigating','Resolved'];
 
   tbody.innerHTML = rows.map(r=>{
@@ -475,15 +538,28 @@ function renderTable(type){
         <td class="no-print"><div class="row-actions"><button class="icon-btn" onclick="deleteEntry('repairs','${r.id}')">Delete</button></div></td>
       </tr>`;
     }
+    if(type==='incidents'){
+      return `<tr>
+        <td class="id">${r.id}</td>
+        <td>${esc(r.location)}</td>
+        <td>${esc(r.description)}</td>
+        <td><span class="pri ${priClass(r.severity)}">${esc(r.severity)}</span></td>
+        <td>${esc(r.reportedBy||'—')}</td>
+        <td class="date">${esc(r.date)}</td>
+        <td>${statusSelect}</td>
+        <td class="no-print"><div class="row-actions"><button class="icon-btn" onclick="deleteEntry('incidents','${r.id}')">Delete</button></div></td>
+      </tr>`;
+    }
     return `<tr>
       <td class="id">${r.id}</td>
-      <td>${esc(r.location)}</td>
-      <td>${esc(r.description)}</td>
-      <td><span class="pri ${priClass(r.severity)}">${esc(r.severity)}</span></td>
-      <td>${esc(r.reportedBy||'—')}</td>
+      <td>${esc(r.generator)}</td>
+      <td>${esc(r.activity)}</td>
+      <td>${r.fuelLevel!==undefined && r.fuelLevel!=='' ? esc(r.fuelLevel)+'%' : '—'}</td>
+      <td>${r.fuelAdded!==undefined && r.fuelAdded!=='' ? esc(r.fuelAdded)+' L' : '—'}</td>
+      <td>${esc(r.performedBy||'—')}</td>
       <td class="date">${esc(r.date)}</td>
       <td>${statusSelect}</td>
-      <td class="no-print"><div class="row-actions"><button class="icon-btn" onclick="deleteEntry('incidents','${r.id}')">Delete</button></div></td>
+      <td class="no-print"><div class="row-actions"><button class="icon-btn" onclick="deleteEntry('generators','${r.id}')">Delete</button></div></td>
     </tr>`;
   }).join('');
 }
@@ -497,7 +573,8 @@ function renderNavCounts(){
   document.getElementById('nav-count-cleaning').textContent = data.cleaning.length;
   document.getElementById('nav-count-repairs').textContent = data.repairs.length;
   document.getElementById('nav-count-incidents').textContent = data.incidents.length;
-  const total = data.cleaning.length + data.repairs.length + data.incidents.length;
+  document.getElementById('nav-count-generators').textContent = data.generators.length;
+  const total = data.cleaning.length + data.repairs.length + data.incidents.length + data.generators.length;
   document.getElementById('nav-count-dashboard').textContent = total ? total : '';
 }
 
@@ -505,11 +582,13 @@ function renderDashboard(){
   const openCleaning = data.cleaning.filter(e=>e.status==='Scheduled').length;
   const openRepairs = data.repairs.filter(e=>e.status!=='Resolved').length;
   const openIncidents = data.incidents.filter(e=>e.status!=='Resolved').length;
-  const total = data.cleaning.length + data.repairs.length + data.incidents.length;
+  const openGenerators = data.generators.filter(e=>e.status==='Scheduled').length;
+  const total = data.cleaning.length + data.repairs.length + data.incidents.length + data.generators.length;
 
   document.getElementById('stat-open-cleaning').textContent = openCleaning;
   document.getElementById('stat-open-repairs').textContent = openRepairs;
   document.getElementById('stat-open-incidents').textContent = openIncidents;
+  document.getElementById('stat-open-generators').textContent = openGenerators;
   document.getElementById('stat-total').textContent = total;
 
   const urgent = [];
@@ -517,6 +596,10 @@ function renderDashboard(){
     .forEach(e=>urgent.push({type:'repair', label:e.location, detail:e.issue, tag:e.priority, date:e.date}));
   data.incidents.filter(e=>e.status!=='Resolved' && (e.severity==='Serious'||e.severity==='Critical'))
     .forEach(e=>urgent.push({type:'incident', label:e.location, detail:e.description, tag:e.severity, date:e.date}));
+  data.generators.filter(e=> e.fuelLevel!=='' && e.fuelLevel!==undefined && Number(e.fuelLevel) < 25)
+    .forEach(e=>urgent.push({type:'generator', label:e.generator, detail:'Fuel level low'+(e.notes?' — '+e.notes:''), tag:'Low fuel', date:e.date}));
+  data.generators.filter(e=>e.status==='Scheduled' && (e.activity==='Routine Service'||e.activity==='Load Test'))
+    .forEach(e=>urgent.push({type:'generator', label:e.generator, detail:e.activity+' scheduled', tag:'Service due', date:e.date}));
 
   const list = document.getElementById('urgent-list');
   if(urgent.length===0){
@@ -565,10 +648,15 @@ function downloadCSV(type){
     {key:'priority',label:'Priority'},{key:'reportedBy',label:'Reported By'},
     {key:'date',label:'Date'},{key:'status',label:'Status'}
   ];
-  else columns = [
+  else if(type==='incidents') columns = [
     {key:'id',label:'ID'},{key:'location',label:'Location'},{key:'description',label:'Description'},
     {key:'severity',label:'Severity'},{key:'reportedBy',label:'Reported By'},
     {key:'date',label:'Date'},{key:'status',label:'Status'}
+  ];
+  else columns = [
+    {key:'id',label:'ID'},{key:'generator',label:'Generator/Location'},{key:'activity',label:'Activity'},
+    {key:'fuelLevel',label:'Fuel Level (%)'},{key:'fuelAdded',label:'Fuel Added (L)'},{key:'runHours',label:'Run Hours'},
+    {key:'performedBy',label:'Performed By'},{key:'date',label:'Date'},{key:'status',label:'Status'},{key:'notes',label:'Notes'}
   ];
   const csv = toCSV(data[type], columns);
   download(`facility-log-${type}-${todayStr()}.csv`, csv);
@@ -584,6 +672,7 @@ function downloadCombinedCSV(){
   data.cleaning.forEach(e=>rows.push({category:'Cleaning', id:e.id, primary:e.area, detail:e.task, level:e.frequency, who:e.assignedTo, date:e.date, status:e.status}));
   data.repairs.forEach(e=>rows.push({category:'Repair', id:e.id, primary:e.location, detail:e.issue, level:e.priority, who:e.reportedBy, date:e.date, status:e.status}));
   data.incidents.forEach(e=>rows.push({category:'Incident', id:e.id, primary:e.location, detail:e.description, level:e.severity, who:e.reportedBy, date:e.date, status:e.status}));
+  data.generators.forEach(e=>rows.push({category:'Generator/Fuel', id:e.id, primary:e.generator, detail:e.activity+(e.notes?' — '+e.notes:''), level:(e.fuelLevel?e.fuelLevel+'%':'')+(e.fuelAdded?' +'+e.fuelAdded+'L':''), who:e.performedBy, date:e.date, status:e.status}));
   const csv = toCSV(rows, columns);
   download(`facility-log-full-report-${todayStr()}.csv`, csv);
 }
