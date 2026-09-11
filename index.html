@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facility Log — Maintenance &amp; Upkeep Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1F2421;
+    --paper:#FAFAF7;
+    --concrete:#E7E4DC;
+    --concrete-dark:#D7D3C7;
+    --line:#C9C4B6;
+    --amber:#E8A33D;
+    --amber-dark:#B87A1E;
+    --steel:#3D5A73;
+    --steel-light:#DCE5EB;
+    --signal:#C64B3C;
+    --signal-light:#F5DCD8;
+    --ok:#4C7A52;
+    --ok-light:#DCE8DD;
+    --sans: 'IBM Plex Sans', -apple-system, sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--concrete);}
+  a{color:inherit;}
+
+  /* ---------- layout ---------- */
+  .shell{display:flex;min-height:100vh;}
+  .rail{
+    width:216px;flex:0 0 216px;background:var(--ink);color:var(--concrete);
+    display:flex;flex-direction:column;padding:22px 0;
+  }
+  .rail-brand{padding:0 20px 20px 20px;border-bottom:1px solid #33392F;margin-bottom:14px;}
+  .rail-brand .mark{font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--amber);}
+  .rail-brand h1{font-size:17px;margin:6px 0 2px 0;font-weight:600;line-height:1.25;}
+  .rail-brand .sub{font-size:12px;color:#9AA098;}
+  nav{display:flex;flex-direction:column;gap:1px;padding:0 10px;}
+  nav button{
+    all:unset;cursor:pointer;padding:10px 12px;border-radius:3px;font-size:14px;
+    display:flex;align-items:center;justify-content:space-between;color:#CFD3C9;
+  }
+  nav button:hover{background:#2B322A;}
+  nav button.active{background:var(--amber);color:var(--ink);font-weight:600;}
+  nav button .count{font-family:var(--mono);font-size:11px;opacity:.85;}
+  .rail-foot{margin-top:auto;padding:16px 20px 0 20px;border-top:1px solid #33392F;font-size:11px;color:#7C8277;line-height:1.5;}
+
+  main{flex:1;padding:32px 40px 60px 40px;max-width:1040px;}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  header.page-head{margin-bottom:22px;}
+  header.page-head h2{font-size:22px;margin:0 0 4px 0;font-weight:600;}
+  header.page-head p{margin:0;color:#5B5F55;font-size:14px;max-width:60ch;}
+
+  /* ---------- dashboard ---------- */
+  .strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px;}
+  .stat{background:var(--paper);border:1px solid var(--line);border-radius:3px;padding:16px 18px;}
+  .stat .num{font-family:var(--mono);font-size:28px;font-weight:600;line-height:1;}
+  .stat .lbl{font-size:12.5px;color:#5B5F55;margin-top:6px;}
+  .stat.warn .num{color:var(--signal);}
+  .stat.amber .num{color:var(--amber-dark);}
+
+  .panel{background:var(--paper);border:1px solid var(--line);border-radius:3px;margin-bottom:24px;}
+  .panel-head{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;}
+  .panel-head h3{font-size:15px;margin:0;font-weight:600;}
+  .panel-body{padding:6px 18px 16px 18px;}
+
+  .urgent-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dashed var(--line);font-size:13.5px;}
+  .urgent-row:last-child{border-bottom:none;}
+  .tag{font-family:var(--mono);font-size:10.5px;padding:2px 7px;border-radius:2px;white-space:nowrap;font-weight:600;}
+  .tag.cleaning{background:var(--steel-light);color:var(--steel);}
+  .tag.repair{background:#F3E4C9;color:var(--amber-dark);}
+  .tag.incident{background:var(--signal-light);color:var(--signal);}
+  .empty-note{color:#8A8F82;font-size:13.5px;padding:14px 0;}
+
+  /* ---------- section (cleaning/repairs/incidents) ---------- */
+  .toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+  .toolbar .filters{display:flex;gap:8px;flex-wrap:wrap;}
+  select, input[type=text], input[type=date], textarea{
+    font-family:var(--sans);font-size:13.5px;border:1px solid var(--line);background:var(--paper);
+    border-radius:3px;padding:8px 10px;color:var(--ink);
+  }
+  textarea{font-family:var(--sans);width:100%;resize:vertical;min-height:60px;}
+  .btn{
+    all:unset;cursor:pointer;font-family:var(--sans);font-size:13.5px;font-weight:600;
+    padding:9px 15px;border-radius:3px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);
+  }
+  .btn:hover{background:#33392F;}
+  .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);}
+  .btn.ghost:hover{background:var(--concrete-dark);}
+  .btn.amber{background:var(--amber);border-color:var(--amber-dark);color:var(--ink);}
+  .btn.amber:hover{background:var(--amber-dark);color:var(--paper);}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap;}
+
+  form.entry-form{
+    background:var(--paper);border:1px solid var(--line);border-radius:3px;
+    padding:18px;margin-bottom:20px;display:none;
+  }
+  form.entry-form.open{display:block;}
+  form.entry-form h4{margin:0 0 14px 0;font-size:14px;font-weight:600;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-size:12px;color:#5B5F55;font-weight:500;}
+  .field.full{grid-column:1/-1;}
+
+  table{width:100%;border-collapse:collapse;background:var(--paper);border:1px solid var(--line);border-radius:3px;overflow:hidden;}
+  thead th{
+    text-align:left;font-size:11.5px;font-weight:600;color:#5B5F55;padding:10px 12px;
+    border-bottom:1px solid var(--line);background:var(--concrete-dark);font-family:var(--mono);
+  }
+  tbody td{padding:11px 12px;font-size:13.5px;border-bottom:1px solid var(--line);vertical-align:top;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:#F3F1EA;}
+  td.id{font-family:var(--mono);font-size:11.5px;color:#8A8F82;}
+  td.date{font-family:var(--mono);font-size:12.5px;white-space:nowrap;}
+  .status-select{font-size:12.5px;padding:5px 8px;}
+  .pri{font-size:11.5px;font-weight:600;font-family:var(--mono);padding:2px 7px;border-radius:2px;}
+  .pri-low{background:var(--ok-light);color:var(--ok);}
+  .pri-medium{background:#F3E4C9;color:var(--amber-dark);}
+  .pri-high, .pri-serious{background:#F6D8CE;color:#A8462F;}
+  .pri-urgent, .pri-critical{background:var(--signal-light);color:var(--signal);}
+  .row-actions{display:flex;gap:8px;}
+  .icon-btn{all:unset;cursor:pointer;font-size:12px;color:#8A8F82;text-decoration:underline;}
+  .icon-btn:hover{color:var(--signal);}
+
+  footer.report-only{display:none;}
+
+  @media print{
+    .rail, .toolbar, form.entry-form, .row-actions, .no-print{display:none !important;}
+    main{padding:0;max-width:none;}
+    body{background:#fff;}
+    .view{display:block !important;}
+    table{border:1px solid #000;}
+    thead th{background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  }
+
+  @media (max-width: 760px){
+    .shell{flex-direction:column;}
+    .rail{width:100%;flex:none;flex-direction:row;overflow-x:auto;padding:14px;}
+    .rail-brand, .rail-foot{display:none;}
+    nav{flex-direction:row;}
+    main{padding:20px;}
+    .grid2{grid-template-columns:1fr;}
+    .strip{grid-template-columns:1fr 1fr;}
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <aside class="rail">
+    <div class="rail-brand">
+      <div class="mark">FACILITY LOG</div>
+      <h1>Maintenance &amp; Upkeep</h1>
+      <div class="sub">Office + Warehouse</div>
+    </div>
+    <nav>
+      <button data-view="dashboard" class="active">Dashboard <span class="count" id="nav-count-dashboard"></span></button>
+      <button data-view="cleaning">Cleaning <span class="count" id="nav-count-cleaning"></span></button>
+      <button data-view="repairs">Repairs <span class="count" id="nav-count-repairs"></span></button>
+      <button data-view="incidents">Incidents <span class="count" id="nav-count-incidents"></span></button>
+    </nav>
+    <div class="rail-foot no-print">
+      Data is stored only in this browser. Nothing is sent anywhere. Use Export to keep a copy.
+    </div>
+  </aside>
+
+  <main>
+
+    <!-- DASHBOARD -->
+    <section class="view active" id="view-dashboard">
+      <header class="page-head">
+        <h2>Dashboard</h2>
+        <p>A snapshot of open work across cleaning, repairs, and incident reports.</p>
+      </header>
+
+      <div class="strip">
+        <div class="stat"><div class="num" id="stat-open-cleaning">0</div><div class="lbl">Cleaning tasks scheduled</div></div>
+        <div class="stat amber"><div class="num" id="stat-open-repairs">0</div><div class="lbl">Repairs open</div></div>
+        <div class="stat warn"><div class="num" id="stat-open-incidents">0</div><div class="lbl">Incidents unresolved</div></div>
+        <div class="stat"><div class="num" id="stat-total">0</div><div class="lbl">Total logged, all time</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Needs attention</h3>
+          <span style="font-size:12px;color:#8A8F82;">High priority &amp; unresolved items</span>
+        </div>
+        <div class="panel-body" id="urgent-list">
+          <div class="empty-note">Nothing urgent on record. Add entries from the Cleaning, Repairs, or Incidents tabs.</div>
+        </div>
+      </div>
+
+      <div class="btn-row no-print">
+        <button class="btn ghost" onclick="downloadCombinedCSV()">Download full report (CSV)</button>
+        <button class="btn ghost" onclick="window.print()">Print / save as PDF</button>
+      </div>
+    </section>
+
+    <!-- CLEANING -->
+    <section class="view" id="view-cleaning">
+      <header class="page-head">
+        <h2>Cleaning</h2>
+        <p>Routine cleaning and upkeep tasks for office and warehouse areas.</p>
+      </header>
+      <div class="toolbar no-print">
+        <div class="filters">
+          <select id="cleaning-filter-status" onchange="renderTable('cleaning')">
+            <option value="">All statuses</option>
+            <option>Scheduled</option><option>Completed</option><option>Skipped</option>
+          </select>
+          <input type="text" id="cleaning-filter-text" placeholder="Search area or task…" oninput="renderTable('cleaning')">
+        </div>
+        <div class="btn-row">
+          <button class="btn ghost" onclick="downloadCSV('cleaning')">Export CSV</button>
+          <button class="btn amber" onclick="toggleForm('cleaning')">+ Log cleaning task</button>
+        </div>
+      </div>
+
+      <form class="entry-form" id="form-cleaning" onsubmit="return addEntry(event,'cleaning')">
+        <h4>New cleaning task</h4>
+        <div class="grid2">
+          <div class="field"><label>Area / room</label><input required type="text" name="area" placeholder="e.g. Warehouse bay 2"></div>
+          <div class="field"><label>Task</label><input required type="text" name="task" placeholder="e.g. Sweep &amp; mop floor"></div>
+          <div class="field"><label>Assigned to</label><input type="text" name="assignedTo" placeholder="Name or team"></div>
+          <div class="field"><label>Frequency</label>
+            <select name="frequency"><option>One-off</option><option>Daily</option><option>Weekly</option><option>Monthly</option></select>
+          </div>
+          <div class="field"><label>Date</label><input required type="date" name="date"></div>
+          <div class="field"><label>Status</label>
+            <select name="status"><option>Scheduled</option><option>Completed</option><option>Skipped</option></select>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn" type="submit">Save task</button>
+          <button class="btn ghost" type="button" onclick="toggleForm('cleaning')">Cancel</button>
+        </div>
+      </form>
+
+      <table>
+        <thead><tr><th>ID</th><th>Area</th><th>Task</th><th>Assigned</th><th>Frequency</th><th>Date</th><th>Status</th><th class="no-print"></th></tr></thead>
+        <tbody id="table-cleaning"></tbody>
+      </table>
+    </section>
+
+    <!-- REPAIRS -->
+    <section class="view" id="view-repairs">
+      <header class="page-head">
+        <h2>Repairs</h2>
+        <p>Equipment, fixtures, and structural repair requests.</p>
+      </header>
+      <div class="toolbar no-print">
+        <div class="filters">
+          <select id="repairs-filter-status" onchange="renderTable('repairs')">
+            <option value="">All statuses</option>
+            <option>Open</option><option>In Progress</option><option>Resolved</option>
+          </select>
+          <select id="repairs-filter-priority" onchange="renderTable('repairs')">
+            <option value="">All priorities</option>
+            <option>Low</option><option>Medium</option><option>High</option><option>Urgent</option>
+          </select>
+          <input type="text" id="repairs-filter-text" placeholder="Search location or issue…" oninput="renderTable('repairs')">
+        </div>
+        <div class="btn-row">
+          <button class="btn ghost" onclick="downloadCSV('repairs')">Export CSV</button>
+          <button class="btn amber" onclick="toggleForm('repairs')">+ Log repair request</button>
+        </div>
+      </div>
+
+      <form class="entry-form" id="form-repairs" onsubmit="return addEntry(event,'repairs')">
+        <h4>New repair request</h4>
+        <div class="grid2">
+          <div class="field"><label>Location / item</label><input required type="text" name="location" placeholder="e.g. Loading dock door 3"></div>
+          <div class="field"><label>Priority</label>
+            <select name="priority"><option>Low</option><option>Medium</option><option selected>High</option><option>Urgent</option></select>
+          </div>
+          <div class="field full"><label>Issue description</label><textarea required name="issue" placeholder="What's wrong, and any relevant detail"></textarea></div>
+          <div class="field"><label>Reported by</label><input type="text" name="reportedBy" placeholder="Name"></div>
+          <div class="field"><label>Date reported</label><input required type="date" name="date"></div>
+          <div class="field"><label>Status</label>
+            <select name="status"><option>Open</option><option>In Progress</option><option>Resolved</option></select>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn" type="submit">Save request</button>
+          <button class="btn ghost" type="button" onclick="toggleForm('repairs')">Cancel</button>
+        </div>
+      </form>
+
+      <table>
+        <thead><tr><th>ID</th><th>Location</th><th>Issue</th><th>Priority</th><th>Reported by</th><th>Date</th><th>Status</th><th class="no-print"></th></tr></thead>
+        <tbody id="table-repairs"></tbody>
+      </table>
+    </section>
+
+    <!-- INCIDENTS -->
+    <section class="view" id="view-incidents">
+      <header class="page-head">
+        <h2>Incident reports</h2>
+        <p>Safety incidents, accidents, and other notable events.</p>
+      </header>
+      <div class="toolbar no-print">
+        <div class="filters">
+          <select id="incidents-filter-status" onchange="renderTable('incidents')">
+            <option value="">All statuses</option>
+            <option>Open</option><option>Investigating</option><option>Resolved</option>
+          </select>
+          <select id="incidents-filter-severity" onchange="renderTable('incidents')">
+            <option value="">All severities</option>
+            <option>Minor</option><option>Moderate</option><option>Serious</option><option>Critical</option>
+          </select>
+          <input type="text" id="incidents-filter-text" placeholder="Search location or description…" oninput="renderTable('incidents')">
+        </div>
+        <div class="btn-row">
+          <button class="btn ghost" onclick="downloadCSV('incidents')">Export CSV</button>
+          <button class="btn amber" onclick="toggleForm('incidents')">+ Log incident</button>
+        </div>
+      </div>
+
+      <form class="entry-form" id="form-incidents" onsubmit="return addEntry(event,'incidents')">
+        <h4>New incident report</h4>
+        <div class="grid2">
+          <div class="field"><label>Location</label><input required type="text" name="location" placeholder="e.g. Warehouse mezzanine"></div>
+          <div class="field"><label>Severity</label>
+            <select name="severity"><option>Minor</option><option selected>Moderate</option><option>Serious</option><option>Critical</option></select>
+          </div>
+          <div class="field full"><label>Description</label><textarea required name="description" placeholder="What happened, who was involved, immediate action taken"></textarea></div>
+          <div class="field"><label>Reported by</label><input type="text" name="reportedBy" placeholder="Name"></div>
+          <div class="field"><label>Date</label><input required type="date" name="date"></div>
+          <div class="field"><label>Status</label>
+            <select name="status"><option>Open</option><option>Investigating</option><option>Resolved</option></select>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn" type="submit">Save report</button>
+          <button class="btn ghost" type="button" onclick="toggleForm('incidents')">Cancel</button>
+        </div>
+      </form>
+
+      <table>
+        <thead><tr><th>ID</th><th>Location</th><th>Description</th><th>Severity</th><th>Reported by</th><th>Date</th><th>Status</th><th class="no-print"></th></tr></thead>
+        <tbody id="table-incidents"></tbody>
+      </table>
+    </section>
+
+  </main>
+</div>
+
+<script>
+const STORAGE_KEY = 'facilityLogData';
+const TYPES = ['cleaning','repairs','incidents'];
+
+function loadData(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return { cleaning: [], repairs: [], incidents: [] };
+}
+function saveData(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+let data = loadData();
+
+function makeId(prefix){
+  const n = Math.floor(Math.random()*9000+1000);
+  return prefix + '-' + Date.now().toString().slice(-5) + n;
+}
+
+// ---------- navigation ----------
+document.querySelectorAll('nav button').forEach(btn=>{
+  btn.addEventListener('click', ()=> switchView(btn.dataset.view));
+});
+function switchView(view){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.id==='view-'+view));
+  if(view==='dashboard') renderDashboard();
+}
+
+// ---------- forms ----------
+function toggleForm(type){
+  const f = document.getElementById('form-'+type);
+  f.classList.toggle('open');
+}
+
+function addEntry(evt, type){
+  evt.preventDefault();
+  const form = evt.target;
+  const fd = new FormData(form);
+  const entry = { id: makeId(type.slice(0,3).toUpperCase()), createdAt: new Date().toISOString() };
+  for(const [k,v] of fd.entries()) entry[k] = v;
+  data[type].unshift(entry);
+  saveData();
+  form.reset();
+  form.classList.remove('open');
+  renderTable(type);
+  renderNavCounts();
+  return false;
+}
+
+function updateStatus(type, id, newStatus){
+  const item = data[type].find(e=>e.id===id);
+  if(item){ item.status = newStatus; saveData(); renderDashboard(); }
+}
+
+function deleteEntry(type, id){
+  if(!confirm('Delete this entry? This cannot be undone.')) return;
+  data[type] = data[type].filter(e=>e.id!==id);
+  saveData();
+  renderTable(type);
+  renderNavCounts();
+  renderDashboard();
+}
+
+// ---------- rendering ----------
+function priClass(val){
+  return 'pri-' + (val||'').toLowerCase();
+}
+
+function renderTable(type){
+  const tbody = document.getElementById('table-'+type);
+  const statusFilter = document.getElementById(type+'-filter-status')?.value || '';
+  const textFilter = (document.getElementById(type+'-filter-text')?.value || '').toLowerCase();
+  const priFilter = document.getElementById(type+'-filter-priority')?.value || '';
+  const sevFilter = document.getElementById(type+'-filter-severity')?.value || '';
+
+  let rows = data[type].slice();
+  if(statusFilter) rows = rows.filter(r=>r.status===statusFilter);
+  if(priFilter) rows = rows.filter(r=>r.priority===priFilter);
+  if(sevFilter) rows = rows.filter(r=>r.severity===sevFilter);
+  if(textFilter){
+    rows = rows.filter(r => JSON.stringify(r).toLowerCase().includes(textFilter));
+  }
+
+  if(rows.length===0){
+    tbody.innerHTML = `<tr><td colspan="8" style="color:#8A8F82;padding:20px 12px;">No entries yet.</td></tr>`;
+    return;
+  }
+
+  let statusOptions;
+  if(type==='cleaning') statusOptions = ['Scheduled','Completed','Skipped'];
+  else if(type==='repairs') statusOptions = ['Open','In Progress','Resolved'];
+  else statusOptions = ['Open','Investigating','Resolved'];
+
+  tbody.innerHTML = rows.map(r=>{
+    const statusSelect = `<select class="status-select" onchange="updateStatus('${type}','${r.id}', this.value)">
+      ${statusOptions.map(s=>`<option ${s===r.status?'selected':''}>${s}</option>`).join('')}
+    </select>`;
+    if(type==='cleaning'){
+      return `<tr>
+        <td class="id">${r.id}</td>
+        <td>${esc(r.area)}</td>
+        <td>${esc(r.task)}</td>
+        <td>${esc(r.assignedTo||'—')}</td>
+        <td>${esc(r.frequency)}</td>
+        <td class="date">${esc(r.date)}</td>
+        <td>${statusSelect}</td>
+        <td class="no-print"><div class="row-actions"><button class="icon-btn" onclick="deleteEntry('cleaning','${r.id}')">Delete</button></div></td>
+      </tr>`;
+    }
+    if(type==='repairs'){
+      return `<tr>
+        <td class="id">${r.id}</td>
+        <td>${esc(r.location)}</td>
+        <td>${esc(r.issue)}</td>
+        <td><span class="pri ${priClass(r.priority)}">${esc(r.priority)}</span></td>
+        <td>${esc(r.reportedBy||'—')}</td>
+        <td class="date">${esc(r.date)}</td>
+        <td>${statusSelect}</td>
+        <td class="no-print"><div class="row-actions"><button class="icon-btn" onclick="deleteEntry('repairs','${r.id}')">Delete</button></div></td>
+      </tr>`;
+    }
+    return `<tr>
+      <td class="id">${r.id}</td>
+      <td>${esc(r.location)}</td>
+      <td>${esc(r.description)}</td>
+      <td><span class="pri ${priClass(r.severity)}">${esc(r.severity)}</span></td>
+      <td>${esc(r.reportedBy||'—')}</td>
+      <td class="date">${esc(r.date)}</td>
+      <td>${statusSelect}</td>
+      <td class="no-print"><div class="row-actions"><button class="icon-btn" onclick="deleteEntry('incidents','${r.id}')">Delete</button></div></td>
+    </tr>`;
+  }).join('');
+}
+
+function esc(s){
+  if(s===undefined || s===null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderNavCounts(){
+  document.getElementById('nav-count-cleaning').textContent = data.cleaning.length;
+  document.getElementById('nav-count-repairs').textContent = data.repairs.length;
+  document.getElementById('nav-count-incidents').textContent = data.incidents.length;
+  const total = data.cleaning.length + data.repairs.length + data.incidents.length;
+  document.getElementById('nav-count-dashboard').textContent = total ? total : '';
+}
+
+function renderDashboard(){
+  const openCleaning = data.cleaning.filter(e=>e.status==='Scheduled').length;
+  const openRepairs = data.repairs.filter(e=>e.status!=='Resolved').length;
+  const openIncidents = data.incidents.filter(e=>e.status!=='Resolved').length;
+  const total = data.cleaning.length + data.repairs.length + data.incidents.length;
+
+  document.getElementById('stat-open-cleaning').textContent = openCleaning;
+  document.getElementById('stat-open-repairs').textContent = openRepairs;
+  document.getElementById('stat-open-incidents').textContent = openIncidents;
+  document.getElementById('stat-total').textContent = total;
+
+  const urgent = [];
+  data.repairs.filter(e=>e.status!=='Resolved' && (e.priority==='High'||e.priority==='Urgent'))
+    .forEach(e=>urgent.push({type:'repair', label:e.location, detail:e.issue, tag:e.priority, date:e.date}));
+  data.incidents.filter(e=>e.status!=='Resolved' && (e.severity==='Serious'||e.severity==='Critical'))
+    .forEach(e=>urgent.push({type:'incident', label:e.location, detail:e.description, tag:e.severity, date:e.date}));
+
+  const list = document.getElementById('urgent-list');
+  if(urgent.length===0){
+    list.innerHTML = `<div class="empty-note">Nothing urgent on record. Add entries from the Cleaning, Repairs, or Incidents tabs.</div>`;
+  } else {
+    urgent.sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+    list.innerHTML = urgent.map(u=>`
+      <div class="urgent-row">
+        <span class="tag ${u.type}">${u.tag}</span>
+        <strong>${esc(u.label)}</strong>
+        <span style="color:#5B5F55;">— ${esc((u.detail||'').slice(0,90))}${(u.detail||'').length>90?'…':''}</span>
+      </div>
+    `).join('');
+  }
+}
+
+// ---------- CSV export ----------
+function toCSV(rows, columns){
+  const header = columns.map(c=>c.label).join(',');
+  const lines = rows.map(r => columns.map(c=>{
+    let v = r[c.key] ?? '';
+    v = String(v).replace(/"/g,'""');
+    return `"${v}"`;
+  }).join(','));
+  return [header, ...lines].join('\n');
+}
+
+function download(filename, content){
+  const blob = new Blob([content], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function downloadCSV(type){
+  let columns;
+  if(type==='cleaning') columns = [
+    {key:'id',label:'ID'},{key:'area',label:'Area'},{key:'task',label:'Task'},
+    {key:'assignedTo',label:'Assigned To'},{key:'frequency',label:'Frequency'},
+    {key:'date',label:'Date'},{key:'status',label:'Status'}
+  ];
+  else if(type==='repairs') columns = [
+    {key:'id',label:'ID'},{key:'location',label:'Location'},{key:'issue',label:'Issue'},
+    {key:'priority',label:'Priority'},{key:'reportedBy',label:'Reported By'},
+    {key:'date',label:'Date'},{key:'status',label:'Status'}
+  ];
+  else columns = [
+    {key:'id',label:'ID'},{key:'location',label:'Location'},{key:'description',label:'Description'},
+    {key:'severity',label:'Severity'},{key:'reportedBy',label:'Reported By'},
+    {key:'date',label:'Date'},{key:'status',label:'Status'}
+  ];
+  const csv = toCSV(data[type], columns);
+  download(`facility-log-${type}-${todayStr()}.csv`, csv);
+}
+
+function downloadCombinedCSV(){
+  const columns = [
+    {key:'category',label:'Category'},{key:'id',label:'ID'},{key:'primary',label:'Location/Area'},
+    {key:'detail',label:'Detail'},{key:'level',label:'Priority/Severity/Frequency'},
+    {key:'who',label:'Assigned/Reported By'},{key:'date',label:'Date'},{key:'status',label:'Status'}
+  ];
+  const rows = [];
+  data.cleaning.forEach(e=>rows.push({category:'Cleaning', id:e.id, primary:e.area, detail:e.task, level:e.frequency, who:e.assignedTo, date:e.date, status:e.status}));
+  data.repairs.forEach(e=>rows.push({category:'Repair', id:e.id, primary:e.location, detail:e.issue, level:e.priority, who:e.reportedBy, date:e.date, status:e.status}));
+  data.incidents.forEach(e=>rows.push({category:'Incident', id:e.id, primary:e.location, detail:e.description, level:e.severity, who:e.reportedBy, date:e.date, status:e.status}));
+  const csv = toCSV(rows, columns);
+  download(`facility-log-full-report-${todayStr()}.csv`, csv);
+}
+
+function todayStr(){
+  const d = new Date();
+  return d.toISOString().slice(0,10);
+}
+
+// ---------- init ----------
+document.querySelectorAll('input[name=date]').forEach(i => i.value = todayStr());
+renderNavCounts();
+renderDashboard();
+TYPES.forEach(renderTable);
+</script>
+
+</body>
+</html>
